@@ -148,7 +148,7 @@ function addStars(n) {
     setTimeout(() => { sfx('win'); confetti(); modal(`<div class="emoji">${st}</div><h2>ملصق جديد!</h2><p>جمعت ${p.stars} نجمة ⭐</p>`); speak('You got a new sticker!'); }, 600);
   }
 }
-const mark = (key, id) => { const p = me(); if (!p) return false; p[key] = p[key] || {}; const isNew = !p[key][id]; p[key][id] = true; save(); return isNew; };
+const mark = (key, id) => { const p = me(); if (!p) return false; p[key] = p[key] || {}; const isNew = !p[key][id]; p[key][id] = true; save(); if (key === 'words' && typeof srsAdd === 'function') srsAdd('w:' + id); return isNew; };
 
 /* ---------- الواجهة العامة ---------- */
 function setTitle(t, showBack = true) {
@@ -202,7 +202,15 @@ views.home = () => {
   setTitle('English Stars ⭐', false);
   const pal = ['#FF6B9D','#FF9F43','#8E6CFF','#1DD1A1','#54A0FF','#EE5A24','#10AC84','#F368E0','#0ABDE3','#5F27CD','#009432','#0652DD'];
   const lettersDone = Object.keys(p.letters || {}).length;
-  render(`<p class="title">مرحباً ${esc(p.name)} ${p.avatar}</p>
+  const today = new Date().toDateString(), yest = new Date(Date.now() - 864e5).toDateString();
+  if (p.lastDay !== today) { p.streak = p.lastDay === yest ? (p.streak || 0) + 1 : 1; p.lastDay = today; save(); }
+  const due = typeof srsDue === 'function' ? srsDue().length : 0;
+  render(`<p class="title">مرحباً ${esc(p.name)} ${p.avatar} <span class="pill" style="display:inline-flex;font-size:16px;vertical-align:middle">🔥 ${p.streak} ${p.streak > 1 ? 'أيام متتالية' : 'يوم'}</span></p>
+   <div class="hero">
+     <button class="card level hero-main" style="background:linear-gradient(135deg,#FF6B9D,#FF9F43)" data-go="act"><span class="emoji">🎬</span><span class="label">كلمات تتحرك</span><span class="small">شاهد <span class="en">"Go!"</span> و <span class="en">"Come here!"</span> وافهم بدون ترجمة</span></button>
+     <button class="card level" style="background:linear-gradient(135deg,#8E6CFF,#54A0FF)" data-go="review"><span class="emoji">🧠</span><span class="label">مراجعة اليوم</span><span class="small">${due ? `${due} كلمة تنتظرك` : 'ثبّت ما تعلمته'}</span>${due ? `<span class="badge" style="background:#FF6B6B;color:#fff;font-size:16px">${due}</span>` : ''}</button>
+     <button class="card level" style="background:linear-gradient(135deg,#1DD1A1,#10AC84)" data-go="games"><span class="emoji">🎮</span><span class="label">العب وتعلّم</span><span class="small">${GAMES.length} ألعاب للحفظ والنطق والكتابة</span></button>
+   </div>
    <p class="sub">رحلتك من الصفر إلى الإتقان — ابدأ من رقم 1 وتقدّم خطوة خطوة</p>
    <div class="progressbar" title="الحروف"><div style="width:${lettersDone / 26 * 100}%"></div></div>
    <p class="sub">تعلمت ${lettersDone} من 26 حرفاً · ⭐ ${p.stars} نجمة · 🎁 ${p.stickers.length} ملصق</p>
@@ -552,15 +560,19 @@ function finishQuiz(type, score, N, back = 'exercises') {
 
 /* ---- 7. الألعاب ---- */
 const GAMES = [
+  {id:'act:guess', icon:'🕵️', name:'شاهد وخمّن', en:'Watch the scene, guess the word', skill:'👀 الفهم'},
+  {id:'act:boss', icon:'🎤', name:'أنت المدير!', en:'Say it — the character does it', skill:'🗣️ النطق'},
+  {id:'monster', icon:'👾', name:'أطعم الوحش', en:'Spell the word to feed him', skill:'✍️ الكتابة'},
+  {id:'act:scene', icon:'👂', name:'اسمع واختر المشهد', en:'Listen & pick the scene', skill:'👂 الاستماع'},
   {id:'balloons', icon:'🎈', name:'فرقع البالون', en:'Pop the letter you hear'},
-  {id:'memory', icon:'🧠', name:'لعبة الذاكرة', en:'Match picture & word'},
-  {id:'simon', icon:'🤸', name:'Simon Says', en:'Listen & move!'},
+  {id:'memory', icon:'🧠', name:'لعبة الذاكرة', en:'Match picture & word', skill:'🧠 الحفظ'},
+  {id:'simon', icon:'🤸', name:'Simon Says', en:'Listen & move!', skill:'🤸 الحركة'},
   {id:'race', icon:'⏱️', name:'سباق الكلمات', en:'60-second race'},
   {id:'memorytricky', icon:'⭐', name:'ذاكرة الكلمات الصعبة', en:'Tricky words match'},
 ];
 views.games = () => {
   setTitle('الألعاب 🎮');
-  render(`<div class="grid big">${GAMES.map((g, i) => `<button class="card level" style="background:${['#FF6B9D','#8E6CFF','#FF9F43','#1DD1A1','#54A0FF'][i]}" data-go="game/${g.id}"><span class="emoji">${g.icon}</span><span class="label">${g.name}</span><span class="small en">${g.en}</span>${me().best['g_' + g.id] ? `<span class="badge" style="color:#2d3047">🏅 ${me().best['g_' + g.id]}</span>` : ''}</button>`).join('')}</div>`);
+  render(`<p class="sub">كل لعبة تقوّي مهارة: 👀 الفهم · 🗣️ النطق · ✍️ الكتابة · 🧠 الحفظ</p><div class="grid big">${GAMES.map((g, i) => `<button class="card level" style="background:${['#FF6B9D','#FF9F43','#8E6CFF','#1DD1A1','#54A0FF','#EE5A24','#10AC84','#F368E0','#0ABDE3'][i % 9]}" data-go="${g.id.startsWith('act:') ? 'actgame/' + g.id.slice(4) : g.id === 'monster' ? 'monster' : 'game/' + g.id}"><span class="emoji">${g.icon}</span><span class="label">${g.name}</span><span class="small en">${g.en}</span>${g.skill ? `<span class="small" style="background:#fff3;border-radius:99px;padding:0 10px">${g.skill}</span>` : ''}${me().best['g_' + g.id] ? `<span class="badge" style="color:#2d3047">🏅 ${me().best['g_' + g.id]}</span>` : ''}</button>`).join('')}</div>`);
 };
 views.game = (id, arg) => ({balloons:gameBalloons, memory:gameMemory, memorytricky:() => gameMemory(null, true), simon:gameSimon, race:gameRace}[id] || (() => go('games')))(arg);
 
@@ -876,6 +888,8 @@ views.parents = () => {
    <p>📗 Year 2: ${UNITS.filter(u => u.year === 2 && (p.best[u.id] || p.best['spell_' + u.id] || 0) >= 7).length}/${UNITS.filter(u => u.year === 2).length} دروس · 📘 Year 3: ${UNITS.filter(u => u.year === 3 && (p.best[u.id] || p.best['spell_' + u.id] || 0) >= 7).length}/${UNITS.filter(u => u.year === 3).length} دروس</p>
    <h2>🧭 خطة مقترحة (15–20 دقيقة يومياً)</h2>
    <ol>
+    <li><b>كل يوم (5 دقائق):</b> 🧠 «مراجعة اليوم» — تعيد الكلمات قبل أن تُنسى بالضبط (نظام الصناديق: بعد 1، 2، 4، 7، 14، 30 يوماً).</li>
+    <li><b>كل يوم (5 دقائق):</b> 🎬 «كلمات تتحرك» — 3 كلمات جديدة: شاهد المشهد ← قلها ← قم بالحركة بنفسك. ثم العبوا «أنت المدير» معاً.</li>
     <li><b>الأسبوع 1–6:</b> 4 حروف أسبوعياً بترتيب الصوتيات (s a t p ثم i n m d…) + كتابتها + حركاتها.</li>
     <li><b>بعد أول 6 حروف:</b> ابدأ بتركيب كلمات صغيرة (sat, pat, tip, pin) — هذا جوهر المنهج البريطاني: <i>Blending</i>.</li>
     <li><b>الشهر 2–3:</b> الأصوات المركبة (sh, ch, th, ee, oo…) + 5 كلمات صعبة أسبوعياً.</li>
