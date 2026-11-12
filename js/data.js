@@ -187,7 +187,9 @@ const LEVELS = [
  {n:7, title:'الألعاب', en:'Games', icon:'🎮', view:'games', year:'كل المستويات'},
  {n:8, title:'الجمل والمحادثة', en:'Speaking', icon:'💬', view:'phrases', year:'Year 1–2'},
  {n:9, title:'القصص والقراءة', en:'Stories', icon:'📚', view:'stories', year:'Year 2'},
- {n:10, title:'فيديوهات تعليمية', en:'Videos', icon:'📺', view:'videos', year:'مساند'},
+ {n:10, title:'Year 2: القواعد والإملاء', en:'Grammar & Spelling', icon:'📗', view:'year/2', year:'Year 2'},
+ {n:11, title:'Year 3: نحو الطلاقة', en:'Grammar, Spelling & Reading', icon:'📘', view:'year/3', year:'Year 3'},
+ {n:12, title:'فيديوهات تعليمية', en:'Videos', icon:'📺', view:'videos', year:'مساند'},
 ];
 
 const AVATARS = ['🦁','🐼','🦄','🐯','🐸','🐰','🦊','🐨','🐙','🦋','🐬','🚀'];
