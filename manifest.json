@@ -1,0 +1,12 @@
+{
+  "name": "English Stars — تعلم الإنجليزية",
+  "short_name": "English Stars",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FFF8E7",
+  "theme_color": "#8E6CFF",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [{"src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
+}

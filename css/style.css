@@ -1,0 +1,158 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@500;700;800&family=Andika:wght@400;700&display=swap');
+:root{
+  --bg:#FFF8E7; --ink:#2D3047; --muted:#6B6F8A; --card:#FFFFFF;
+  --pink:#FF6B9D; --orange:#FF9F43; --yellow:#FECA57; --green:#1DD1A1; --blue:#54A0FF; --purple:#8E6CFF; --red:#FF6B6B;
+  --shadow:0 6px 0 rgba(45,48,71,.15); --radius:24px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{font-family:'Baloo Bhaijaan 2',system-ui,sans-serif;background:var(--bg);color:var(--ink);
+  background-image:radial-gradient(circle at 10% 10%,#FFE3EC 0 80px,transparent 81px),radial-gradient(circle at 90% 30%,#DFF6FF 0 110px,transparent 111px),radial-gradient(circle at 20% 90%,#E6FFF5 0 120px,transparent 121px);
+  background-attachment:fixed;overflow-x:hidden}
+.en{font-family:'Andika','Comic Sans MS',sans-serif;direction:ltr;unicode-bidi:isolate}
+button{font-family:inherit;cursor:pointer;border:none}
+.hidden{display:none!important}
+
+/* شريط علوي */
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:10px 16px;background:linear-gradient(90deg,#8E6CFF,#54A0FF);color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.1)}
+.topbar .back{background:#fff3;color:#fff;font-size:24px;width:46px;height:46px;border-radius:50%}
+.topbar h1{font-size:22px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{background:#fff;color:var(--ink);border-radius:99px;padding:4px 14px;font-weight:800;display:flex;align-items:center;gap:6px;font-size:18px}
+.avatar-btn{font-size:28px;background:#fff;border-radius:50%;width:46px;height:46px}
+
+main{max-width:1100px;margin:0 auto;padding:18px 16px 90px}
+.title{font-size:28px;margin:6px 0 4px;text-align:center}
+.sub{color:var(--muted);text-align:center;margin:0 0 18px}
+
+/* بطاقات */
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.grid.big{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;text-align:center;transition:transform .15s;position:relative;border:3px solid transparent}
+button.card:active,.card.tap:active{transform:scale(.95) translateY(3px);box-shadow:0 2px 0 rgba(45,48,71,.15)}
+button.card:hover{transform:translateY(-3px)}
+.card .emoji{font-size:56px;line-height:1.1;display:block}
+.card .label{font-weight:800;font-size:20px}
+.card .small{color:var(--muted);font-size:14px}
+.card .badge{position:absolute;top:8px;left:8px;background:var(--yellow);border-radius:99px;padding:0 8px;font-size:13px;font-weight:800}
+
+.level{color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:170px;justify-content:center}
+.level .num{position:absolute;top:10px;right:12px;background:#fff;color:var(--ink);width:30px;height:30px;border-radius:50%;font-weight:800;line-height:30px}
+.level .emoji{font-size:64px;filter:drop-shadow(0 4px 0 rgba(0,0,0,.15))}
+.level .label{font-size:22px}
+.level .small{color:#fffd}
+
+.letter-card{padding:10px}
+.letter-card .big{font-size:54px;font-weight:700;line-height:1}
+.letter-card.done{border-color:var(--green)}
+.letter-card.done::after{content:'⭐';position:absolute;top:4px;left:8px}
+
+/* تفاصيل الحرف */
+.lesson{background:#fff;border-radius:32px;box-shadow:var(--shadow);padding:20px;text-align:center}
+.huge{font-size:clamp(110px,26vw,190px);font-weight:700;line-height:1;margin:0;display:inline-flex;gap:24px;color:var(--purple)}
+.huge span:last-child{color:var(--pink)}
+.pic{font-size:clamp(90px,20vw,140px);display:inline-block;animation:bob 2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-12px) rotate(-4deg)}}
+.word-big{font-size:clamp(36px,8vw,60px);font-weight:700;letter-spacing:2px}
+.word-big .hl{color:var(--pink);text-decoration:underline wavy}
+.actionbox{background:#FFF4D6;border-radius:20px;padding:12px 16px;margin:14px auto;max-width:560px;font-size:19px;border:3px dashed var(--orange)}
+.btnrow{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:14px 0}
+.btn{background:var(--blue);color:#fff;font-weight:800;font-size:19px;padding:12px 20px;border-radius:18px;box-shadow:0 5px 0 rgba(0,0,0,.18);display:inline-flex;align-items:center;gap:8px}
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,.18)}
+.btn.pink{background:var(--pink)}.btn.green{background:var(--green)}.btn.orange{background:var(--orange)}.btn.purple{background:var(--purple)}.btn.red{background:var(--red)}.btn.yellow{background:var(--yellow);color:var(--ink)}
+.btn.ghost{background:#fff;color:var(--ink)}
+.navrow{display:flex;justify-content:space-between;gap:10px;margin-top:16px}
+
+/* أداة الكتابة */
+.tracer-wrap{position:relative;background:#fff;border-radius:28px;box-shadow:var(--shadow);overflow:hidden;touch-action:none;margin:0 auto;max-width:720px}
+.tracer-wrap canvas{display:block;width:100%;height:auto;touch-action:none}
+.colors{display:flex;gap:8px;justify-content:center;margin:10px 0}
+.colors button{width:38px;height:38px;border-radius:50%;border:4px solid #fff;box-shadow:0 2px 6px #0003}
+.colors button.on{outline:4px solid var(--ink)}
+.stars{font-size:44px;text-align:center;min-height:56px;letter-spacing:6px}
+
+/* تمارين */
+.q-head{text-align:center;margin-bottom:10px}
+.progressbar{height:16px;background:#fff;border-radius:99px;overflow:hidden;box-shadow:inset 0 2px 4px #0002;margin:6px 0 16px}
+.progressbar div{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));transition:width .4s;border-radius:99px}
+.options{display:grid;gap:14px;grid-template-columns:repeat(2,1fr);max-width:620px;margin:0 auto}
+.options .card{font-size:22px;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.options .card .emoji{font-size:64px}
+.card.correct{border-color:var(--green);background:#E3FFF5;animation:pop .4s}
+.card.wrong{border-color:var(--red);background:#FFE8E8;animation:shake .4s}
+@keyframes pop{50%{transform:scale(1.08)}}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.slots{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:16px 0;direction:ltr}
+.slot{width:56px;height:66px;border-radius:14px;background:#fff;border:3px dashed var(--muted);font-size:38px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.slot.filled{border-style:solid;border-color:var(--purple);color:var(--purple)}
+.tiles{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;direction:ltr}
+.tile{width:60px;height:64px;border-radius:16px;background:var(--yellow);font-size:34px;font-weight:700;box-shadow:0 5px 0 #d9a520;color:var(--ink)}
+.tile.word{width:auto;padding:0 16px;font-size:26px}
+.tile:disabled{opacity:.25}
+.listen-big{font-size:60px;width:120px;height:120px;border-radius:50%;background:var(--pink);color:#fff;box-shadow:0 8px 0 #c94a77;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 8px 0 #c94a77,0 0 0 0 #ff6b9d88}70%{box-shadow:0 8px 0 #c94a77,0 0 0 24px #ff6b9d00}}
+
+/* لعبة البالونات */
+.sky{position:relative;height:62vh;min-height:380px;background:linear-gradient(#8fd3ff,#d9f2ff);border-radius:28px;overflow:hidden;box-shadow:var(--shadow);touch-action:manipulation}
+.balloon{position:absolute;bottom:-140px;width:84px;height:104px;border-radius:50% 50% 48% 48%;display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:700;color:#fff;text-shadow:0 2px 0 #0003;cursor:pointer;user-select:none}
+.balloon::after{content:'';position:absolute;bottom:-40px;left:50%;width:2px;height:40px;background:#fff9}
+.balloon.popped{animation:popb .3s forwards}
+@keyframes popb{to{transform:scale(1.8);opacity:0}}
+.cloud{position:absolute;font-size:70px;opacity:.9;animation:drift 30s linear infinite}
+@keyframes drift{from{transform:translateX(-120px)}to{transform:translateX(120vw)}}
+
+/* لعبة الذاكرة */
+.memory{display:grid;gap:10px;grid-template-columns:repeat(4,1fr);max-width:620px;margin:0 auto}
+.mcard{aspect-ratio:1;perspective:600px;background:none;padding:0}
+.mcard .in{position:relative;width:100%;height:100%;transition:transform .45s;transform-style:preserve-3d}
+.mcard.flip .in{transform:rotateY(180deg)}
+.mcard .f,.mcard .b{position:absolute;inset:0;border-radius:18px;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;box-shadow:var(--shadow)}
+.mcard .f{background:linear-gradient(135deg,var(--purple),var(--pink));font-size:40px;color:#fff}
+.mcard .b{background:#fff;transform:rotateY(180deg);font-size:clamp(18px,4.5vw,42px);font-weight:700;padding:4px;text-align:center}
+.mcard.matched .b{background:#E3FFF5}
+
+/* قصص */
+.story-line{display:flex;align-items:center;gap:14px;background:#fff;border-radius:20px;padding:14px;margin:10px 0;box-shadow:var(--shadow);cursor:pointer}
+.story-line .e{font-size:42px;min-width:70px;text-align:center}
+.story-line .t{font-size:26px;flex:1}
+.story-line .ar{color:var(--muted);font-size:16px}
+.w{display:inline-block;padding:0 3px;border-radius:8px;transition:background .2s}
+.w.on{background:var(--yellow)}
+
+/* phrases list */
+.phrase{display:flex;align-items:center;gap:10px;background:#fff;border-radius:18px;padding:12px 14px;margin:8px 0;box-shadow:0 4px 0 #0001}
+.phrase .t{flex:1}
+.phrase .t .en{font-size:22px;font-weight:700}
+.phrase .t .ar{color:var(--muted)}
+.icon-btn{width:48px;height:48px;border-radius:50%;font-size:22px;background:var(--blue);color:#fff;flex:none}
+.icon-btn.mic{background:var(--pink)}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px}
+.tabs button{background:#fff;border-radius:99px;padding:8px 16px;font-size:17px;font-weight:700;box-shadow:0 3px 0 #0001}
+.tabs button.on{background:var(--purple);color:#fff}
+
+/* ملفات الأطفال */
+.profiles{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;margin:20px 0}
+.profile{width:160px}
+.profile .emoji{font-size:72px}
+.av-pick{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0}
+.av-pick button{font-size:36px;background:#fff;border-radius:16px;width:60px;height:60px;border:3px solid transparent}
+.av-pick button.on{border-color:var(--purple)}
+input.txt{font-family:inherit;font-size:22px;padding:10px 16px;border-radius:16px;border:3px solid #ddd;width:100%;max-width:320px;text-align:center}
+
+/* إعدادات */
+.setting{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border-radius:18px;padding:12px 16px;margin:10px 0;box-shadow:0 4px 0 #0001;flex-wrap:wrap}
+select,input[type=range]{font-family:inherit;font-size:18px}
+
+/* مكافأة */
+.overlay{position:fixed;inset:0;background:#2d304799;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:#fff;border-radius:32px;padding:26px;text-align:center;max-width:420px;width:100%;animation:pop .4s}
+.modal .emoji{font-size:90px}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 20px;border-radius:99px;z-index:70;font-size:18px;animation:pop .3s}
+.mascot{position:fixed;bottom:12px;left:12px;font-size:54px;z-index:30;cursor:pointer;animation:bob 2.4s ease-in-out infinite;background:none}
+.bubble{position:fixed;bottom:78px;left:16px;background:#fff;border-radius:18px;padding:8px 14px;box-shadow:var(--shadow);z-index:30;max-width:220px;font-size:16px}
+.sticker-book{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:10px}
+.sticker-book div{background:#fff;border-radius:16px;font-size:44px;text-align:center;padding:6px;box-shadow:0 3px 0 #0001}
+.sticker-book div.locked{filter:grayscale(1) opacity(.25)}
+.video-card{display:block;text-decoration:none;color:inherit}
+.note{background:#E8F4FF;border-radius:18px;padding:12px 16px;margin:12px 0;border-right:6px solid var(--blue)}
+@media(max-width:520px){.options{grid-template-columns:1fr 1fr;gap:10px}.memory{gap:6px}.topbar h1{font-size:18px}.slot{width:44px;height:54px;font-size:30px}.tile{width:50px;height:56px;font-size:28px}}
