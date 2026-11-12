@@ -34,13 +34,14 @@ function pickVoice() {
   const pref = list.find(v => /natural|google|female|libby|sonia|serena|samantha|kate/i.test(v.name));
   return pref || list[0] || voices.find(v => /^en/i.test(v.lang));
 }
-function speak(text, {rate, onend, onboundary} = {}) {
+function altVoice() { const main = pickVoice(); const list = voices.filter(v => v.lang && v.lang.replace('_', '-').startsWith(settings.accent) && v !== main); return list.find(v => /male|daniel|arthur|george|fred|alex/i.test(v.name)) || list[0] || main; }
+function speak(text, {rate, pitch, alt, onend, onboundary} = {}) {
   if (!window.speechSynthesis) { toast('النطق غير مدعوم في هذا المتصفح'); onend && onend(); return; }
   speechSynthesis.cancel();
   text = String(text).replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{20E3}]/gu, '').replace(/\*\*/g, '').replace(/→/g, ', ').replace(/\s+/g, ' ').trim();
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = settings.accent; u.rate = rate || settings.rate; u.pitch = 1.1;
-  const v = pickVoice(); if (v) u.voice = v;
+  u.lang = settings.accent; u.rate = rate || settings.rate; u.pitch = pitch || 1.1;
+  const v = alt ? altVoice() : pickVoice(); if (v) u.voice = v;
   if (onend) u.onend = onend;
   if (onboundary) u.onboundary = onboundary;
   speechSynthesis.speak(u);
@@ -200,7 +201,7 @@ views.newprofile = () => {
 views.home = () => {
   const p = me();
   setTitle('English Stars ⭐', false);
-  const pal = ['#FF6B9D','#FF9F43','#8E6CFF','#1DD1A1','#54A0FF','#EE5A24','#10AC84','#F368E0','#0ABDE3','#5F27CD','#009432','#0652DD'];
+  const pal = ['#FF6B9D','#FF9F43','#EE5A24','#10AC84','#8E6CFF','#1DD1A1','#0ABDE3','#54A0FF','#F368E0','#5F27CD','#FF6B6B','#00B894','#E17055','#009432','#0652DD','#6C5CE7'];
   const lettersDone = Object.keys(p.letters || {}).length;
   const today = new Date().toDateString(), yest = new Date(Date.now() - 864e5).toDateString();
   if (p.lastDay !== today) { p.streak = p.lastDay === yest ? (p.streak || 0) + 1 : 1; p.lastDay = today; save(); }
@@ -474,7 +475,7 @@ views.quiz = (type, topic) => {
   if (mixYear) deck = shuffle(UNITS.filter(u => u.year === mixYear && u.items).flatMap(u => u.items.map(it => ({it, unit:u}))));
   const ex = unit ? {icon:unit.icon, name:unit.title} : mixYear ? {icon:'🏆', name:`اختبار Year ${mixYear} الشامل`} : (EXERCISES.find(e => e.id === type) || {name:'اختبار', icon:'📝'});
   setTitle(`${ex.icon} ${ex.name}`);
-  const back = unit ? `unit/${unit.id}` : mixYear ? `year/${mixYear}` : 'exercises';
+  const back = unit ? `unit/${unit.id}` : mixYear ? `year/${mixYear}` : (typeof QUIZ_BACK !== 'undefined' && QUIZ_BACK[type]) || 'exercises';
   const N = mixYear ? 15 : 10; let q = 0, score = 0;
   const next = () => {
     if (q >= N) return finishQuiz(type, score, N, back);

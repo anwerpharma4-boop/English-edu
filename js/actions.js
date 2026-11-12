@@ -32,6 +32,10 @@ function makeStage(el) {
     async pop(e, opt) { const d = S.add(e, opt); await S.mv(d, [{t:'scale(0)'}, {t:'scale(1.3)'}, {t:'scale(1)'}], 400); return d; },
     wait: async ms => { await wait(ms); if (!alive()) throw 'stop'; },
     swap: (d, e) => { d.textContent = e; },
+    bg: c => { inner.style.background = c; },
+    ground: c => { const g = inner.querySelector('.ground'); if (c === null) g.style.display = 'none'; else { g.style.background = c; g.style.borderTopColor = c; } },
+    noCloud: () => { inner.querySelector('.sun-bg').style.display = 'none'; },
+    say(txt, {x = 50, y = 150, s = 24} = {}) { const d = S.add(txt, {x, y, s, z:9}); d.classList.add('speech'); return d; },
     all: ps => Promise.all(ps),
   };
   return S;
