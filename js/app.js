@@ -34,12 +34,14 @@ function pickVoice() {
   const pref = list.find(v => /natural|google|female|libby|sonia|serena|samantha|kate/i.test(v.name));
   return pref || list[0] || voices.find(v => /^en/i.test(v.lang));
 }
-function speak(text, {rate, onend, onboundary} = {}) {
+function altVoice() { const main = pickVoice(); const list = voices.filter(v => v.lang && v.lang.replace('_', '-').startsWith(settings.accent) && v !== main); return list.find(v => /male|daniel|arthur|george|fred|alex/i.test(v.name)) || list[0] || main; }
+function speak(text, {rate, pitch, alt, onend, onboundary} = {}) {
   if (!window.speechSynthesis) { toast('النطق غير مدعوم في هذا المتصفح'); onend && onend(); return; }
   speechSynthesis.cancel();
+  text = String(text).replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{20E3}]/gu, '').replace(/\*\*/g, '').replace(/→/g, ', ').replace(/\s+/g, ' ').trim();
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = settings.accent; u.rate = rate || settings.rate; u.pitch = 1.1;
-  const v = pickVoice(); if (v) u.voice = v;
+  u.lang = settings.accent; u.rate = rate || settings.rate; u.pitch = pitch || 1.1;
+  const v = alt ? altVoice() : pickVoice(); if (v) u.voice = v;
   if (onend) u.onend = onend;
   if (onboundary) u.onboundary = onboundary;
   speechSynthesis.speak(u);
@@ -147,7 +149,7 @@ function addStars(n) {
     setTimeout(() => { sfx('win'); confetti(); modal(`<div class="emoji">${st}</div><h2>ملصق جديد!</h2><p>جمعت ${p.stars} نجمة ⭐</p>`); speak('You got a new sticker!'); }, 600);
   }
 }
-const mark = (key, id) => { const p = me(); if (!p) return false; p[key] = p[key] || {}; const isNew = !p[key][id]; p[key][id] = true; save(); return isNew; };
+const mark = (key, id) => { const p = me(); if (!p) return false; p[key] = p[key] || {}; const isNew = !p[key][id]; p[key][id] = true; save(); if (key === 'words' && typeof srsAdd === 'function') srsAdd('w:' + id); return isNew; };
 
 /* ---------- الواجهة العامة ---------- */
 function setTitle(t, showBack = true) {
@@ -199,9 +201,17 @@ views.newprofile = () => {
 views.home = () => {
   const p = me();
   setTitle('English Stars ⭐', false);
-  const pal = ['#FF6B9D','#FF9F43','#8E6CFF','#1DD1A1','#54A0FF','#EE5A24','#10AC84','#F368E0','#0ABDE3','#5F27CD'];
+  const pal = ['#FF6B9D','#FF9F43','#EE5A24','#10AC84','#8E6CFF','#1DD1A1','#0ABDE3','#54A0FF','#F368E0','#5F27CD','#FF6B6B','#00B894','#E17055','#009432','#0652DD','#6C5CE7'];
   const lettersDone = Object.keys(p.letters || {}).length;
-  render(`<p class="title">مرحباً ${esc(p.name)} ${p.avatar}</p>
+  const today = new Date().toDateString(), yest = new Date(Date.now() - 864e5).toDateString();
+  if (p.lastDay !== today) { p.streak = p.lastDay === yest ? (p.streak || 0) + 1 : 1; p.lastDay = today; save(); }
+  const due = typeof srsDue === 'function' ? srsDue().length : 0;
+  render(`<p class="title">مرحباً ${esc(p.name)} ${p.avatar} <span class="pill" style="display:inline-flex;font-size:16px;vertical-align:middle">🔥 ${p.streak} ${p.streak > 1 ? 'أيام متتالية' : 'يوم'}</span></p>
+   <div class="hero">
+     <button class="card level hero-main" style="background:linear-gradient(135deg,#FF6B9D,#FF9F43)" data-go="act"><span class="emoji">🎬</span><span class="label">كلمات تتحرك</span><span class="small">شاهد <span class="en">"Go!"</span> و <span class="en">"Come here!"</span> وافهم بدون ترجمة</span></button>
+     <button class="card level" style="background:linear-gradient(135deg,#8E6CFF,#54A0FF)" data-go="review"><span class="emoji">🧠</span><span class="label">مراجعة اليوم</span><span class="small">${due ? `${due} كلمة تنتظرك` : 'ثبّت ما تعلمته'}</span>${due ? `<span class="badge" style="background:#FF6B6B;color:#fff;font-size:16px">${due}</span>` : ''}</button>
+     <button class="card level" style="background:linear-gradient(135deg,#1DD1A1,#10AC84)" data-go="games"><span class="emoji">🎮</span><span class="label">العب وتعلّم</span><span class="small">${GAMES.length} ألعاب للحفظ والنطق والكتابة</span></button>
+   </div>
    <p class="sub">رحلتك من الصفر إلى الإتقان — ابدأ من رقم 1 وتقدّم خطوة خطوة</p>
    <div class="progressbar" title="الحروف"><div style="width:${lettersDone / 26 * 100}%"></div></div>
    <p class="sub">تعلمت ${lettersDone} من 26 حرفاً · ⭐ ${p.stars} نجمة · 🎁 ${p.stickers.length} ملصق</p>
@@ -459,23 +469,30 @@ const QUIZ = {
   spell: 'custom', sentence: 'custom', speak: 'custom',
 };
 views.quiz = (type, topic) => {
-  const ex = EXERCISES.find(e => e.id === type) || {name:'اختبار', icon:'📝'};
+  const unit = UNIT_BY_ID[type]; const mixYear = /^mix_\d$/.test(type) ? +type.slice(4) : 0;
+  let deck = null;
+  if (unit) deck = shuffle(unit.items.map(it => ({it, unit})));
+  if (mixYear) deck = shuffle(UNITS.filter(u => u.year === mixYear && u.items).flatMap(u => u.items.map(it => ({it, unit:u}))));
+  const ex = unit ? {icon:unit.icon, name:unit.title} : mixYear ? {icon:'🏆', name:`اختبار Year ${mixYear} الشامل`} : (EXERCISES.find(e => e.id === type) || {name:'اختبار', icon:'📝'});
   setTitle(`${ex.icon} ${ex.name}`);
-  const N = 10; let q = 0, score = 0;
+  const back = unit ? `unit/${unit.id}` : mixYear ? `year/${mixYear}` : (typeof QUIZ_BACK !== 'undefined' && QUIZ_BACK[type]) || 'exercises';
+  const N = mixYear ? 15 : 10; let q = 0, score = 0;
   const next = () => {
-    if (q >= N) return finishQuiz(type, score, N);
+    if (q >= N) return finishQuiz(type, score, N, back);
     q++;
     const head = `<div class="progressbar"><div style="width:${(q - 1) / N * 100}%"></div></div><p class="sub">سؤال ${q} من ${N} · ✅ ${score}</p>`;
-    const done = ok => { if (ok) score++; setTimeout(next, ok ? 1100 : 1600); };
+    let Q;
+    const done = ok => { if (ok) score++; setTimeout(next, ok ? 1300 : (Q && Q.reveal ? 2600 : 1600)); };
     if (type === 'spell') return spellQ(head, topic, done);
     if (type === 'sentence') return sentenceQ(head, done);
     if (type === 'speak') return speakQ(head, topic, done);
-    const Q = (QUIZ[type] || QUIZ.listen)(topic);
-    render(`${head}<div class="q-head">${Q.prompt}</div><div class="options" style="${Q.cols === 3 ? 'grid-template-columns:repeat(3,1fr)' : ''}">${Q.options.map((o, i) => `<button class="card" data-i="${i}">${o.html}</button>`).join('')}</div>`);
+    Q = deck ? unitQuestion(deck[(q - 1) % deck.length]) : (QUIZ[type] || QUIZ.listen)(topic);
+    render(`${head}${unit || mixYear ? `<p class="sub">${deck[(q - 1) % deck.length].unit.icon} ${deck[(q - 1) % deck.length].unit.en}</p>` : ''}<div class="q-head">${Q.prompt}</div><div class="options" style="${Q.cols === 3 ? 'grid-template-columns:repeat(3,1fr)' : Q.cols === 1 ? 'grid-template-columns:1fr;max-width:640px' : ''}">${Q.options.map((o, i) => `<button class="card" data-i="${i}" style="${Q.cols === 1 ? 'min-height:70px' : ''}">${o.html}</button>`).join('')}</div><div id="qreveal"></div>`);
     if (Q.say) setTimeout(() => speak(Q.say), 300);
     let answered = false;
     main().querySelectorAll('.options .card').forEach(b => b.onclick = () => {
       if (answered) return; const o = Q.options[+b.dataset.i];
+      if (Q.reveal) setTimeout(() => { const r = $('#qreveal'); if (r) r.innerHTML = Q.reveal; }, 50);
       if (o.ok) { answered = true; b.classList.add('correct'); sfx('good'); speak(Q.after); done(true); }
       else { b.classList.add('wrong'); sfx('bad'); answered = true; main().querySelectorAll('.options .card').forEach((x, j) => { if (Q.options[j].ok) x.classList.add('correct'); }); speak(Q.after); done(false); }
     });
@@ -532,27 +549,31 @@ function speakQ(head, topic, done) {
   });
   $('#skip').onclick = () => done(false);
 }
-function finishQuiz(type, score, N) {
+function finishQuiz(type, score, N, back = 'exercises') {
   const p = me(); p.best[type] = Math.max(p.best[type] || 0, score); save();
-  const st = score >= 9 ? 3 : score >= 7 ? 2 : score >= 4 ? 1 : 0;
+  const pct = score / N; const st = pct >= .9 ? 3 : pct >= .7 ? 2 : pct >= .4 ? 1 : 0;
   render(`<div class="lesson"><div class="emoji" style="font-size:100px">${st === 3 ? '🏆' : st === 2 ? '🥈' : st ? '👍' : '💪'}</div>
    <p class="title">${score} من ${N}</p><div class="stars">${'⭐'.repeat(st)}</div>
    <p class="sub">${st === 3 ? 'ممتاز! أنت نجم!' : st === 2 ? 'رائع جداً! استمر' : st ? 'جيد! تدرّب أكثر لتحصل على نجوم أكثر' : 'لا بأس! المحاولة طريق النجاح'}</p>
-   <div class="btnrow"><button class="btn green" data-act="reload">🔁 مرة أخرى</button><button class="btn ghost" data-go="exercises">تمارين أخرى</button></div></div>`);
+   <div class="btnrow"><button class="btn green" data-act="reload">🔁 مرة أخرى</button><button class="btn ghost" data-go="${back}">${back === 'exercises' ? 'تمارين أخرى' : 'رجوع للدرس'}</button></div></div>`);
   if (st) { sfx('win'); confetti(); addStars(st); speak(st === 3 ? 'Fantastic! You are a super star!' : 'Well done!'); }
 }
 
 /* ---- 7. الألعاب ---- */
 const GAMES = [
+  {id:'act:guess', icon:'🕵️', name:'شاهد وخمّن', en:'Watch the scene, guess the word', skill:'👀 الفهم'},
+  {id:'act:boss', icon:'🎤', name:'أنت المدير!', en:'Say it — the character does it', skill:'🗣️ النطق'},
+  {id:'monster', icon:'👾', name:'أطعم الوحش', en:'Spell the word to feed him', skill:'✍️ الكتابة'},
+  {id:'act:scene', icon:'👂', name:'اسمع واختر المشهد', en:'Listen & pick the scene', skill:'👂 الاستماع'},
   {id:'balloons', icon:'🎈', name:'فرقع البالون', en:'Pop the letter you hear'},
-  {id:'memory', icon:'🧠', name:'لعبة الذاكرة', en:'Match picture & word'},
-  {id:'simon', icon:'🤸', name:'Simon Says', en:'Listen & move!'},
+  {id:'memory', icon:'🧠', name:'لعبة الذاكرة', en:'Match picture & word', skill:'🧠 الحفظ'},
+  {id:'simon', icon:'🤸', name:'Simon Says', en:'Listen & move!', skill:'🤸 الحركة'},
   {id:'race', icon:'⏱️', name:'سباق الكلمات', en:'60-second race'},
   {id:'memorytricky', icon:'⭐', name:'ذاكرة الكلمات الصعبة', en:'Tricky words match'},
 ];
 views.games = () => {
   setTitle('الألعاب 🎮');
-  render(`<div class="grid big">${GAMES.map((g, i) => `<button class="card level" style="background:${['#FF6B9D','#8E6CFF','#FF9F43','#1DD1A1','#54A0FF'][i]}" data-go="game/${g.id}"><span class="emoji">${g.icon}</span><span class="label">${g.name}</span><span class="small en">${g.en}</span>${me().best['g_' + g.id] ? `<span class="badge" style="color:#2d3047">🏅 ${me().best['g_' + g.id]}</span>` : ''}</button>`).join('')}</div>`);
+  render(`<p class="sub">كل لعبة تقوّي مهارة: 👀 الفهم · 🗣️ النطق · ✍️ الكتابة · 🧠 الحفظ</p><div class="grid big">${GAMES.map((g, i) => `<button class="card level" style="background:${['#FF6B9D','#FF9F43','#8E6CFF','#1DD1A1','#54A0FF','#EE5A24','#10AC84','#F368E0','#0ABDE3'][i % 9]}" data-go="${g.id.startsWith('act:') ? 'actgame/' + g.id.slice(4) : g.id === 'monster' ? 'monster' : 'game/' + g.id}"><span class="emoji">${g.icon}</span><span class="label">${g.name}</span><span class="small en">${g.en}</span>${g.skill ? `<span class="small" style="background:#fff3;border-radius:99px;padding:0 10px">${g.skill}</span>` : ''}${me().best['g_' + g.id] ? `<span class="badge" style="color:#2d3047">🏅 ${me().best['g_' + g.id]}</span>` : ''}</button>`).join('')}</div>`);
 };
 views.game = (id, arg) => ({balloons:gameBalloons, memory:gameMemory, memorytricky:() => gameMemory(null, true), simon:gameSimon, race:gameRace}[id] || (() => go('games')))(arg);
 
@@ -680,14 +701,23 @@ views.phrases = () => {
 views.stories = (i) => {
   if (i === undefined) {
     setTitle('القصص والقراءة 📚');
-    render(`<p class="sub">قصص قصيرة بكلمات سهلة — اضغط على أي كلمة لتسمعها</p><div class="grid big">${STORIES.map((s, k) => `<button class="card" data-go="stories/${k}"><span class="emoji">${s.pic}</span><div class="label en">${s.title}</div></button>`).join('')}</div>`);
+    render(`<p class="sub">قصص قصيرة بكلمات سهلة — اضغط على أي كلمة لتسمعها</p><div class="grid big">${STORIES.map((s, k) => `<button class="card" data-go="stories/${k}"><span class="emoji">${s.pic}</span><div class="label en">${s.title}</div><div class="small">Year 1</div></button>`).join('')}</div>
+     <h2 class="title">📚 قصص مع أسئلة فهم</h2><div class="grid big">${READING.map((s, k) => `<button class="card" data-go="read/${k}"><span class="emoji">${s.pic}</span><div class="label en">${s.title}</div><div class="small">Year ${s.year} · ${s.qs.length} أسئلة</div></button>`).join('')}</div>`);
     return;
   }
   const S = STORIES[+i]; if (!S) return go('stories');
+  renderStory(S, 'story_' + i, `<button class="btn ghost" data-go="stories">كل القصص</button><button class="btn ghost" data-go="stories/${(+i + 1) % STORIES.length}">القصة التالية ←</button>`);
+};
+views.read = (i) => {
+  const S = READING[+i]; if (!S) return go('stories');
+  renderStory(S, 'read_' + i, `<button class="btn ghost" data-go="year/${S.year}">رجوع لـ Year ${S.year}</button>`);
+};
+function renderStory(S, key, nav) {
   setTitle(`📖 ${S.title}`);
   render(`<div class="btnrow"><button class="btn green" id="readAll">▶️ اقرأ لي القصة</button></div>
     ${S.lines.map(([en, ar, e], k) => `<div class="story-line" data-line="${k}"><div class="e">${e}</div><div class="t"><div class="en">${en.split(' ').map(w => `<span class="w" data-word="${esc(w.replace(/[^A-Za-z']/g, ''))}">${esc(w)}</span>`).join(' ')}</div>${settings.arabic ? `<div class="ar">${ar}</div>` : ''}</div><button class="icon-btn mic" data-act="sayIt" data-arg="${esc(en)}">🎤</button></div>`).join('')}
-    <div class="navrow"><button class="btn ghost" data-go="stories">كل القصص</button><button class="btn ghost" data-go="stories/${(+i + 1) % STORIES.length}">القصة التالية ←</button></div>`);
+    ${S.qs ? `<h2 class="title">🧠 أسئلة الفهم <span class="en">(Comprehension)</span></h2><div id="cq">${S.qs.map(([q, opts], k) => { const order = shuffle(opts.map((o, j) => j)); return `<div class="lesson" style="margin:12px 0;text-align:left" data-q="${k}"><div class="en" style="font-size:22px;font-weight:700"><button class="icon-btn" data-act="say" data-arg="${esc(q)}" style="width:38px;height:38px;font-size:16px">🔊</button> ${k + 1}. ${esc(q)}</div><div class="btnrow" style="justify-content:flex-start">${order.map(j => `<button class="btn ghost en" data-opt="${j}">${esc(opts[j])}</button>`).join('')}</div></div>`; }).join('')}</div>` : ''}
+    <div class="navrow">${nav}</div>`);
   const readLine = (k, then) => {
     const el = main().querySelector(`[data-line="${k}"]`); if (!el) return;
     const ws = [...el.querySelectorAll('.w')]; let wi = 0, gotBoundary = false; ws.forEach(w => w.classList.remove('on'));
@@ -699,8 +729,27 @@ views.stories = (i) => {
   };
   main().querySelectorAll('.w').forEach(w => w.onclick = ev => { ev.stopPropagation(); w.classList.add('on'); speak(w.dataset.word); setTimeout(() => w.classList.remove('on'), 900); });
   main().querySelectorAll('.story-line').forEach(l => l.onclick = () => readLine(+l.dataset.line));
-  $('#readAll').onclick = () => { let k = 0; const nx = () => { if (k < S.lines.length) readLine(k++, nx); else { if (mark('words', 'story_' + i)) addStars(2); praise(); } }; nx(); };
-};
+  $('#readAll').onclick = () => { let k = 0; const nx = () => { if (k < S.lines.length) readLine(k++, nx); else { if (mark('words', key)) addStars(2); praise(); } }; nx(); };
+  if (S.qs) {
+    let answered = 0, right = 0;
+    main().querySelectorAll('[data-q]').forEach(box => {
+      const qi = +box.dataset.q; let done = false;
+      box.querySelectorAll('[data-opt]').forEach(b => b.onclick = () => {
+        if (done) return; done = true; answered++;
+        const ok = +b.dataset.opt === S.qs[qi][2];
+        if (ok) { right++; b.style.background = 'var(--green)'; b.style.color = '#fff'; sfx('good'); }
+        else { b.style.background = 'var(--red)'; b.style.color = '#fff'; sfx('bad'); box.querySelector(`[data-opt="${S.qs[qi][2]}"]`).style.background = '#B8F5DF'; }
+        speak(S.qs[qi][1][S.qs[qi][2]]);
+        if (answered === S.qs.length) setTimeout(() => {
+          const st = right === S.qs.length ? 3 : right >= S.qs.length - 1 ? 2 : right >= S.qs.length / 2 ? 1 : 0;
+          const p = me(); p.best[key] = Math.max(p.best[key] || 0, right); save();
+          if (st) { addStars(st); confetti(); sfx('win'); }
+          modal(`<div class="emoji">${st === 3 ? '🏆' : '📖'}</div><h2>${right} من ${S.qs.length}</h2><div class="stars">${'⭐'.repeat(st)}</div><p>${st === 3 ? 'فهمت القصة تماماً!' : 'اقرأ القصة مرة أخرى وحاول من جديد'}</p>`);
+        }, 900);
+      });
+    });
+  }
+}
 
 /* ---- 10. الفيديوهات ---- */
 views.videos = () => {
@@ -720,6 +769,87 @@ views.videos = () => {
   render(`<div class="note">📌 للأهل: هذه الأزرار تفتح بحث يوتيوب في نافذة جديدة. يُفضّل أن تشاهدوا مع الطفل وتختاروا الفيديو معه، وفعّلوا <b>YouTube Kids</b> للأمان. ⏰ يُنصح بـ 15–20 دقيقة يومياً.</div>
    <div class="grid big">${items.map(([e, n, q, d]) => `<a class="card video-card" href="${yt(q)}" target="_blank" rel="noopener"><span class="emoji">${e}</span><div class="label">${n}</div><div class="small">${d || '▶️ يوتيوب'}</div></a>`).join('')}</div>
    <div class="note">🇬🇧/🇺🇸 التطبيق يعتمد النطق البريطاني افتراضياً (مثل المنهج)، ويمكن تحويله للأمريكي من ⚙️ الإعدادات ليتوافق مع فيديوهات القناة الأمريكية.</div>`);
+};
+
+/* ---- 11/12. Year 2 و Year 3 ---- */
+const UNIT_BY_ID = Object.fromEntries(UNITS.map(u => [u.id, u]));
+const hl = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<span class="hl">$1</span>');
+views.year = (n) => {
+  n = +n; const p = me();
+  setTitle(`Year ${n} ${n === 2 ? '📗' : '📘'}`);
+  const units = UNITS.filter(u => u.year === n);
+  const done = units.filter(u => (p.best[u.id] || p.best['spell_' + u.id] || 0) >= 7).length;
+  render(`<p class="title">${n === 2 ? 'المستوى الثاني — Year 2' : 'المستوى الثالث — Year 3'}</p>
+   <p class="sub">${n === 2 ? 'قواعد الكتابة الأولى: الجمع، اللواحق، الماضي والحاضر، علامات الترقيم، وأنواع الكلمات والجمل' : 'نحو الطلاقة: البادئات، المضارع التام، الكلام المباشر، الأفعال الشاذة، والقراءة والفهم'}</p>
+   <div class="progressbar"><div style="width:${done / units.length * 100}%"></div></div><p class="sub">أتقنت ${done} من ${units.length} دروس (7/10 أو أكثر)</p>
+   <div class="grid">${units.map((u, k) => { const b = u.spelling ? p.best['spell_' + u.id] : p.best[u.id]; return `<button class="card ${b >= 7 ? 'letter-card done' : ''}" data-go="unit/${u.id}"><span class="badge" style="background:#fff;border:2px solid var(--purple)">${k + 1}</span><span class="emoji" style="font-size:44px">${u.icon}</span><div class="label" style="font-size:17px">${u.title}</div><div class="small en">${u.en}</div>${b ? `<div class="small">🏅 ${b}/10</div>` : ''}</button>`; }).join('')}</div>
+   <h2 class="title">📚 القراءة والفهم</h2>
+   <div class="grid big">${READING.map((s, k) => s.year === n ? `<button class="card" data-go="read/${k}"><span class="emoji">${s.pic}</span><div class="label en">${s.title}</div>${p.best['read_' + k] !== undefined ? `<div class="small">🏅 ${p.best['read_' + k]}/${s.qs.length}</div>` : ''}</button>` : '').join('')}</div>
+   <div class="btnrow" style="margin-top:20px"><button class="btn purple" data-go="quiz/mix_${n}" style="font-size:22px">🏆 اختبار Year ${n} الشامل (15 سؤال)</button></div>
+   ${p.best['mix_' + n] ? `<p class="sub">أفضل نتيجة: ${p.best['mix_' + n]}/15</p>` : ''}`);
+};
+views.unit = (id) => {
+  const u = UNIT_BY_ID[id]; if (!u) return go('home');
+  setTitle(`${u.icon} ${u.title}`);
+  const list = UNITS.filter(x => x.year === u.year); const k = list.indexOf(u);
+  render(`<div class="lesson" style="text-align:right">
+    <div class="pic" style="font-size:80px">${u.icon}</div>
+    <h2 style="text-align:center;margin:4px 0">${u.title} <span class="en small">· ${u.en}</span></h2>
+    <div class="actionbox" style="max-width:none;text-align:right;line-height:1.9">📘 <b>القاعدة:</b><br>${u.rule}</div>
+    ${u.ex ? `<p class="sub">👇 اضغط على كل مثال لتسمعه</p>${u.ex.map(([en, ar, e]) => `<div class="phrase" data-act="say" data-arg="${esc(en)}" style="cursor:pointer"><div style="font-size:38px">${e}</div><div class="t"><div class="en" style="font-size:24px">${hl(en)}</div>${settings.arabic ? `<div class="ar">${ar}</div>` : ''}</div><button class="icon-btn">🔊</button></div>`).join('')}` : ''}
+    ${u.spelling ? `<p class="sub">👇 اضغط على الكلمة لتسمعها وتسمع تهجئتها</p><div class="btnrow">${u.words.map(w => `<button class="btn ghost en" style="font-size:22px" data-act="spellWord" data-arg="${w}">${w}</button>`).join('')}</div>` : ''}
+    <div class="btnrow" style="margin-top:20px">${u.spelling ? `<button class="btn green" data-go="spelltest/${u.id}" style="font-size:24px">🐝 اختبار الإملاء</button>` : `<button class="btn green" data-go="quiz/${u.id}" style="font-size:24px">📝 تمرّن الآن (10 أسئلة)</button>`}</div>
+    <div class="navrow"><button class="btn ghost" ${k > 0 ? `data-go="unit/${list[k - 1].id}"` : 'disabled style="opacity:.3"'}>→ الدرس السابق</button><button class="btn ghost" data-go="year/${u.year}">كل الدروس</button><button class="btn ghost" ${k < list.length - 1 ? `data-go="unit/${list[k + 1].id}"` : 'disabled style="opacity:.3"'}>الدرس التالي ←</button></div></div>`);
+};
+function unitQuestion({it, unit}) {
+  const why = it.why ? `<div class="note">💡 ${esc(it.why)}</div>` : '';
+  if (it.t === 'b') {
+    const opts = shuffle([it.a, ...it.d]);
+    const filled = esc(it.s).replace('___', `<span class="hl">${esc(it.a)}</span>`);
+    return {prompt:`<div class="lesson"><div class="en" style="font-size:clamp(24px,5.5vw,38px);font-weight:700;line-height:1.5">${esc(it.s).replace('___', '<span class="slot" style="display:inline-flex;width:auto;min-width:90px;height:52px;vertical-align:middle;font-size:28px">?</span>')}</div><button class="btn ghost" data-act="say" data-arg="${esc(it.s.replace('___', '...').replace(/\([^)]*\)/g, ''))}">🔊 اسمع</button></div><p class="sub">اختر الكلمة الصحيحة للفراغ</p>`,
+      options:opts.map(o => ({html:`<span class="label en" style="font-size:28px">${esc(o)}</span>`, ok:o === it.a})), cols:opts.length === 2 ? 0 : 3,
+      after:it.s.replace('___', it.a).replace(/\([^)]*\)/g, ''), reveal:`<div class="lesson" style="margin-top:12px"><div class="en" style="font-size:24px">✅ ${filled}</div>${why}</div>`};
+  }
+  if (it.t === 'c') {
+    const opts = shuffle([it.a, ...it.d]);
+    return {prompt:`<div class="pic" style="font-size:70px">✍️</div><p class="title" style="font-size:22px">أيّ جملة مكتوبة بشكل صحيح؟</p>`,
+      options:opts.map(o => ({html:`<span class="en" style="font-size:clamp(18px,4.5vw,26px);font-weight:700">${esc(o)}</span>`, ok:o === it.a})), cols:1,
+      after:it.a, reveal:why ? `<div class="lesson" style="margin-top:12px">${why}</div>` : ''};
+  }
+  // تصنيف
+  const cats = unit.cats; const isSentence = it.w.includes(' ');
+  return {prompt:`<div class="lesson"><div class="word-big en" style="font-size:clamp(28px,7vw,52px)">${esc(it.w)}</div><button class="btn ghost" data-act="say" data-arg="${esc(it.w)}">🔊 اسمع</button></div><p class="sub">${isSentence ? 'ما نوع هذه الجملة؟' : 'ما نوع هذه الكلمة؟'}</p>`,
+    say:it.w, options:Object.keys(cats).map(c => ({html:`<span class="label">${cats[c]}</span><span class="small en">${c}</span>`, ok:c === it.a})), after:it.w,
+    reveal:`<div class="lesson" style="margin-top:12px"><span class="en">${esc(it.w)}</span> = <b>${cats[it.a]}</b>${why}</div>`};
+}
+views.spelltest = (id) => {
+  const u = UNIT_BY_ID[id]; if (!u || !u.spelling) return go('home');
+  setTitle(`🐝 Spelling Bee — Year ${u.year}`);
+  const words = sample(u.words, 10); let q = 0, score = 0;
+  const next = () => {
+    if (q >= words.length) return finishQuiz('spell_' + id, score, words.length, `unit/${id}`);
+    const w = words[q++]; let tries = 0;
+    render(`<div class="progressbar"><div style="width:${(q - 1) * 10}%"></div></div><p class="sub">كلمة ${q} من ${words.length} · ✅ ${score}</p>
+     <div class="lesson"><button class="listen-big" id="hearW">🔊</button><p class="sub">اسمع الكلمة واكتبها بالإنجليزية</p>
+     <input class="txt en" id="ans" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="type here…" style="font-size:30px;direction:ltr">
+     <div id="hint" class="slots"></div>
+     <div class="btnrow"><button class="btn green" id="chk">✅ تحقق</button><button class="btn ghost" id="slow">🐢 ببطء</button><button class="btn ghost" id="skipW">تخطَّ ⏭️</button></div></div>`);
+    const say = r => speak(w, {rate:r});
+    setTimeout(() => say(), 300);
+    $('#hearW').onclick = () => say(); $('#slow').onclick = () => say(.5);
+    const inp = $('#ans'); setTimeout(() => inp.focus(), 100);
+    const showWord = () => { $('#hint').innerHTML = w.split('').map(c => `<span class="slot filled">${c}</span>`).join(''); };
+    const check = () => {
+      const a = inp.value.trim().toLowerCase(); if (!a) return;
+      if (a === w.toLowerCase()) { score += tries ? 0 : 1; sfx('good'); praise(); inp.style.borderColor = 'var(--green)'; showWord(); setTimeout(next, 1400); return; }
+      tries++; sfx('bad'); inp.animate([{transform:'translateX(-8px)'}, {transform:'translateX(8px)'}, {transform:'none'}], {duration:300});
+      if (tries === 1) { $('#hint').innerHTML = w.split('').map((c, i) => `<span class="slot ${i === 0 ? 'filled' : ''}">${i === 0 ? c : ''}</span>`).join(''); toast(`الكلمة فيها ${w.length} حروف — تبدأ بـ ${w[0]}`); say(.6); }
+      else { showWord(); toast('هذه هي الكلمة الصحيحة — انظر إليها جيداً 👀'); cleanup = speakSeq([{say:w}, ...w.toLowerCase().split('').map(c => ({say:letterName(c), rate:1}))], null, null, 80); setTimeout(next, 4200); }
+    };
+    $('#chk').onclick = check; inp.onkeydown = e => { if (e.key === 'Enter') check(); };
+    $('#skipW').onclick = () => { showWord(); say(); setTimeout(next, 1800); };
+  };
+  next();
 };
 
 /* ---- الملصقات ---- */
@@ -756,13 +886,18 @@ views.parents = () => {
   render(`<div class="lesson" style="text-align:right">
    <h2>📊 تقدّم ${esc(p.name)}</h2>
    <p>🔤 الحروف: ${LETTERS.filter(L => p.letters[L.l]).length}/26 · 🔊 الأصوات المركبة: ${DIGRAPHS.filter(D => p.letters['dg_' + D.g]).length}/${DIGRAPHS.length} · ✍️ كتابة: ${Object.keys(p.traced).length} · 🖼️ كلمات: ${Object.keys(p.words).filter(k => !k.startsWith('story_')).length}/${ALL_WORDS.length} · ⭐ ${p.stars}</p>
+   <p>📗 Year 2: ${UNITS.filter(u => u.year === 2 && (p.best[u.id] || p.best['spell_' + u.id] || 0) >= 7).length}/${UNITS.filter(u => u.year === 2).length} دروس · 📘 Year 3: ${UNITS.filter(u => u.year === 3 && (p.best[u.id] || p.best['spell_' + u.id] || 0) >= 7).length}/${UNITS.filter(u => u.year === 3).length} دروس</p>
    <h2>🧭 خطة مقترحة (15–20 دقيقة يومياً)</h2>
    <ol>
+    <li><b>كل يوم (5 دقائق):</b> 🧠 «مراجعة اليوم» — تعيد الكلمات قبل أن تُنسى بالضبط (نظام الصناديق: بعد 1، 2، 4، 7، 14، 30 يوماً).</li>
+    <li><b>كل يوم (5 دقائق):</b> 🎬 «كلمات تتحرك» — 3 كلمات جديدة: شاهد المشهد ← قلها ← قم بالحركة بنفسك. ثم العبوا «أنت المدير» معاً.</li>
     <li><b>الأسبوع 1–6:</b> 4 حروف أسبوعياً بترتيب الصوتيات (s a t p ثم i n m d…) + كتابتها + حركاتها.</li>
     <li><b>بعد أول 6 حروف:</b> ابدأ بتركيب كلمات صغيرة (sat, pat, tip, pin) — هذا جوهر المنهج البريطاني: <i>Blending</i>.</li>
     <li><b>الشهر 2–3:</b> الأصوات المركبة (sh, ch, th, ee, oo…) + 5 كلمات صعبة أسبوعياً.</li>
     <li><b>الشهر 3 وما بعده:</b> موضوع كلمات كل أسبوع (حيوانات، ألوان…) + لعبة + تمارين.</li>
     <li><b>الشهر 4+:</b> الجمل والمحادثة والقصص — اقرؤوا قصة معاً كل يوم.</li>
+    <li><b>Year 2:</b> درس واحد في الأسبوع (القاعدة ← الأمثلة ← التمرين) + 10 كلمات إملاء أسبوعياً + قصة مع أسئلة فهم. اختبار شامل كل شهر.</li>
+    <li><b>Year 3:</b> نفس النظام، مع كتابة 3–5 جمل يومياً على ورقة باستخدام قاعدة الأسبوع.</li>
    </ol>
    <h2>💡 لماذا هذه الطريقة؟</h2>
    <ul>
@@ -797,6 +932,7 @@ const actions = {
   setLevel: a => { level = a; store.set('ee_level', a); views.exercises(); },
   phraseTab: a => { phraseTab = +a; views.phrases(); },
   reload: () => route(),
+  spellWord: w => { if (cleanup) cleanup(); cleanup = speakSeq([{say:w}, ...w.toLowerCase().split('').map(c => ({say:letterName(c), rate:1})), {say:w}], null, null, 90); },
 };
 document.addEventListener('click', e => {
   const g = e.target.closest('[data-go]'); if (g) { sfx('tap'); go(g.dataset.go); return; }
