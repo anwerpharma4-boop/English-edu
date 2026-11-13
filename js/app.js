@@ -24,27 +24,64 @@ const SIMPLE_WORDS = (() => { const seen = new Set(); return ALL_WORDS.filter(x 
 const LETTER_NAMES_GB = {a:'ay',b:'bee',c:'see',d:'dee',e:'ee',f:'eff',g:'jee',h:'aitch',i:'eye',j:'jay',k:'kay',l:'ell',m:'em',n:'en',o:'oh',p:'pee',q:'cue',r:'ar',s:'ess',t:'tee',u:'you',v:'vee',w:'double you',x:'ex',y:'why',z:'zed'};
 const letterName = l => (l === 'z' && settings.accent === 'en-US') ? 'zee' : LETTER_NAMES_GB[l];
 
-/* ---------- النطق ---------- */
+/* ---------- النطق (متوافق مع آيفون/آيباد/أندرويد) ---------- */
 let voices = [];
-const loadVoices = () => { voices = (window.speechSynthesis && speechSynthesis.getVoices()) || []; };
-if (window.speechSynthesis) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+const synth = window.speechSynthesis;
+const loadVoices = () => { voices = (synth && synth.getVoices()) || []; };
+if (synth) {
+  loadVoices(); synth.onvoiceschanged = loadVoices;
+  // بعض أجهزة أندرويد لا ترسل حدث تحميل الأصوات — نعيد المحاولة
+  let tries = 0; const poll = setInterval(() => { loadVoices(); if (voices.length || ++tries > 20) clearInterval(poll); }, 250);
+}
+const englishVoices = () => voices.filter(v => /^en/i.test((v.lang || '').replace('_', '-')));
 function pickVoice() {
   const lang = settings.accent;
   const list = voices.filter(v => v.lang && v.lang.replace('_', '-').startsWith(lang));
-  const pref = list.find(v => /natural|google|female|libby|sonia|serena|samantha|kate/i.test(v.name));
-  return pref || list[0] || voices.find(v => /^en/i.test(v.lang));
+  const pref = list.find(v => /natural|enhanced|premium|google|libby|sonia|serena|samantha|kate|martha/i.test(v.name));
+  return pref || list[0] || englishVoices()[0] || null;
 }
-function altVoice() { const main = pickVoice(); const list = voices.filter(v => v.lang && v.lang.replace('_', '-').startsWith(settings.accent) && v !== main); return list.find(v => /male|daniel|arthur|george|fred|alex/i.test(v.name)) || list[0] || main; }
+function altVoice() { const main = pickVoice(); const list = englishVoices().filter(v => v !== main && v.lang.replace('_', '-').startsWith(settings.accent)); return list.find(v => /male|daniel|arthur|george|fred|alex|oliver/i.test(v.name)) || list[0] || main; }
+
+// فتح الصوت: المتصفحات لا تسمح بالصوت قبل أول لمسة من المستخدم
+let audioUnlocked = false;
+function unlockAudio() {
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume();
+    const b = actx.createBuffer(1, 1, 22050), src = actx.createBufferSource(); src.buffer = b; src.connect(actx.destination); src.start(0); } catch (e) {}
+  if (synth && !audioUnlocked) { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } catch (e) {} }
+  audioUnlocked = true;
+}
+['pointerdown', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, unlockAudio, {capture:true, passive:true}));
+
+let speakToken = 0; const _keep = [];
 function speak(text, {rate, pitch, alt, onend, onboundary} = {}) {
-  if (!window.speechSynthesis) { toast('النطق غير مدعوم في هذا المتصفح'); onend && onend(); return; }
-  speechSynthesis.cancel();
+  if (!synth) { toast('النطق غير مدعوم هنا — افتح التطبيق في Safari أو Chrome'); onend && setTimeout(onend, 300); return; }
   text = String(text).replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{20E3}]/gu, '').replace(/\*\*/g, '').replace(/→/g, ', ').replace(/\s+/g, ' ').trim();
+  if (!text) { onend && setTimeout(onend, 50); return; }
+  const my = ++speakToken;
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = settings.accent; u.rate = rate || settings.rate; u.pitch = pitch || 1.1;
-  const v = alt ? altVoice() : pickVoice(); if (v) u.voice = v;
-  if (onend) u.onend = onend;
+  u.lang = settings.accent; u.rate = rate || settings.rate; u.pitch = pitch || 1.1; u.volume = 1;
+  const v = alt ? altVoice() : pickVoice(); if (v) { u.voice = v; u.lang = v.lang; }
+  // نضمن استدعاء onend مرة واحدة حتى لو علِق محرك الصوت
+  let finished = false; let guard;
+  const finish = () => { if (finished) return; finished = true; clearTimeout(guard); if (onend && my === speakToken) onend(); };
+  u.onend = finish; u.onerror = e => { if (e && e.error === 'not-allowed') showSoundGate(); finish(); };
   if (onboundary) u.onboundary = onboundary;
-  speechSynthesis.speak(u);
+  _keep.push(u); if (_keep.length > 5) _keep.shift(); // منع حذف الجملة من الذاكرة قبل نطقها (خلل في Chrome)
+  const go = () => {
+    if (my !== speakToken) return;
+    try { synth.resume(); synth.speak(u); } catch (e) { finish(); return; }
+    guard = setTimeout(finish, 2500 + text.length * 140 / (u.rate || 1));
+  };
+  if (synth.speaking || synth.pending) { synth.cancel(); setTimeout(go, 90); } // الإلغاء ثم النطق فوراً يُسكت الصوت في بعض المتصفحات
+  else go();
+}
+// شاشة "اضغط للبدء" — تمنح المتصفح اللمسة الأولى اللازمة لتشغيل الصوت
+function showSoundGate() {
+  if (document.querySelector('.sound-gate')) return;
+  const o = document.createElement('div'); o.className = 'overlay sound-gate';
+  o.innerHTML = `<button class="modal" style="border:none;cursor:pointer"><div class="emoji">🔊</div><h2>اضغط هنا لنبدأ!</h2><p class="en" style="font-size:22px">Tap to start</p></button>`;
+  o.onclick = () => { unlockAudio(); o.remove(); speak("Hello! Let's learn English!"); };
+  document.body.appendChild(o);
 }
 // نطق سلسلة متتابعة مع دالة لكل خطوة (للتهجئة والأناشيد)
 function speakSeq(items, each, done, gap = 250) {
@@ -57,7 +94,7 @@ function speakSeq(items, each, done, gap = 250) {
     i++;
   };
   next();
-  return () => { stopped = true; speechSynthesis.cancel(); };
+  return () => { stopped = true; speakToken++; if (synth) synth.cancel(); };
 }
 
 /* ---------- التعرف على الصوت (قل الكلمة) ---------- */
@@ -94,7 +131,7 @@ function sayIt(word, el) {
 let actx;
 function tone(freq, dur, type = 'sine', when = 0, vol = .18) {
   try {
-    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume();
     const o = actx.createOscillator(), g = actx.createGain();
     o.type = type; o.frequency.value = freq; o.connect(g); g.connect(actx.destination);
     const t = actx.currentTime + when; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
@@ -870,7 +907,20 @@ views.settings = () => {
    <div class="setting"><span>🔔 المؤثرات الصوتية</span><input type="checkbox" id="sf" ${settings.sfx ? 'checked' : ''} style="width:28px;height:28px"></div>
    <div class="setting"><span>👤 تغيير الطفل</span><button class="btn purple" data-go="profiles">الملفات</button></div>
    <div class="setting"><span>🗑️ حذف ملف ${esc(me().name)}</span><button class="btn red" id="del">حذف</button></div>
-   <p class="sub">${pickVoice() ? 'الصوت المستخدم: ' + esc(pickVoice().name) : '⚠️ لا يوجد صوت إنجليزي في الجهاز — ثبّت صوت English من إعدادات الجهاز'}</p>`);
+   <div class="lesson" style="margin-top:14px"><h2>🔊 فحص الصوت</h2>
+     <div class="btnrow"><button class="btn green" id="sndTest" style="font-size:22px">🔊 اختبر الصوت</button><button class="btn ghost" id="sfxTest">🔔 اختبر المؤثرات</button></div>
+     <p id="sndInfo" class="sub"></p>
+     <div class="note" style="text-align:right">إذا لم تسمع شيئاً:<br>
+      1️⃣ ارفع صوت الجهاز، وفي الآيفون/الآيباد <b>أطفئ الوضع الصامت</b> 🔕<br>
+      2️⃣ افتح الرابط في <b>Safari</b> أو <b>Chrome</b> مباشرة، وليس من داخل واتساب أو تيليجرام أو فيسبوك (متصفحاتها الداخلية تمنع النطق)<br>
+      3️⃣ <b>آيفون/آيباد:</b> الإعدادات ← تسهيل الاستخدام ← المحتوى المنطوق ← الأصوات ← English ← نزّل صوتاً (مثل Daniel أو Serena)<br>
+      4️⃣ <b>أندرويد:</b> الإعدادات ← الإدارة العامة (أو النظام) ← اللغة ← تحويل النص إلى كلام ← محرك Google ← ⚙️ ← تثبيت بيانات الصوت ← English (United Kingdom)<br>
+      5️⃣ أغلق التطبيق تماماً وافتحه من جديد</div></div>`);
+  const info = () => { loadVoices(); const en = englishVoices(); const v = pickVoice();
+    $('#sndInfo').innerHTML = !synth ? '❌ هذا المتصفح لا يدعم النطق — افتح الرابط في Safari أو Chrome' : en.length ? `✅ يوجد ${en.length} صوت إنجليزي · المستخدم الآن: <b class="en">${esc(v ? v.name : '')}</b>` : '⚠️ لم أجد صوتاً إنجليزياً في الجهاز — اتبع الخطوة 3 أو 4 بالأسفل'; };
+  info(); setTimeout(info, 1500);
+  $('#sndTest').onclick = () => { unlockAudio(); speak('Hello! I can speak English. One, two, three!', {onend:() => toast('هل سمعت الصوت؟ 🙂')}); };
+  $('#sfxTest').onclick = () => { unlockAudio(); sfx('win'); };
   $('#acc').value = settings.accent;
   $('#acc').onchange = e => { settings.accent = e.target.value; save(); speak('Hello!'); };
   $('#rate').oninput = e => { settings.rate = +e.target.value; save(); };
@@ -913,7 +963,7 @@ views.parents = () => {
 /* ===================== التوجيه والأحداث ===================== */
 function route() {
   if (cleanup) { try { cleanup(); } catch (e) {} cleanup = null; }
-  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (synth) { speakToken++; synth.cancel(); }
   document.querySelectorAll('.overlay').forEach(o => o.remove());
   let [name, ...args] = (location.hash.slice(1) || 'home').split('/');
   if (!me() && name !== 'newprofile') name = profiles.length ? 'profiles' : 'newprofile';
@@ -945,6 +995,7 @@ window.addEventListener('DOMContentLoaded', () => {
   $('#starPill').onclick = () => go('stickers');
   $('#mascot').onclick = () => { mascotTalk(); speak(rand(["Let's learn!", "You can do it!", "Hello, friend!", "Keep going!"])); };
   route();
+  if (synth) showSoundGate();
   setTimeout(() => mascotTalk('أهلاً! أنا البومة أولي 🦉 اضغط عليّ لنصيحة!'), 1200);
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 });
