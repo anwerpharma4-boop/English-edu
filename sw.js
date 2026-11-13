@@ -1,5 +1,5 @@
 // يعمل التطبيق بدون إنترنت بعد أول فتح
-const CACHE = 'english-stars-v4';
+const CACHE = 'english-stars-v5';
 const FILES = ['./', './index.html', './css/style.css', './js/data.js', './js/data-y23.js', './js/app.js', './js/actions.js', './js/world.js', './manifest.json', './icons/icon.svg'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });

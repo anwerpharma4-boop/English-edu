@@ -219,3 +219,6 @@ select,input[type=range]{font-family:inherit;font-size:18px}
 .bubble-d.on{visibility:visible;animation:pop .3s}
 .bubble-d small{display:block;color:var(--muted);direction:rtl;font-family:'Baloo Bhaijaan 2',sans-serif}
 @media(max-width:520px){.dialog{height:330px}.who .face{font-size:64px}.bubble-d{font-size:15px}.wagon{min-width:80px;font-size:15px}}
+
+.sound-gate{z-index:80}
+.sound-gate .modal{animation:pulse 1.6s infinite}
