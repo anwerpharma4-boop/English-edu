@@ -453,7 +453,7 @@ roof:'<path d="M14 32h36v26H14z" fill="#f3ead8" stroke="#b9ad94" stroke-width="2
 xray:'<rect x="8" y="6" width="48" height="52" rx="5" fill="#16202e"/><path d="M32 12v40" stroke="#dfe9f5" stroke-width="4" stroke-linecap="round"/><path d="M32 20c-10-3-14 2-14 8M32 20c10-3 14 2 14 8M32 29c-10-3-14 2-14 8M32 29c10-3 14 2 14 8M32 38c-9-2-12 2-12 7M32 38c9-2 12 2 12 7" fill="none" stroke="#dfe9f5" stroke-width="3" stroke-linecap="round"/>'};
 /* ===================== الحالة ===================== */
 const $=s=>document.querySelector(s),main=$('#main');
-let S={name:'',st:{},tr:{},stars:0,days:[],custom:[],col:{},ds:{},set:{voice:'',rate:.85,vol:1,ar:true,arVoice:'',sfx:true,ls:'rb'}};
+let S={name:'',st:{},tr:{},stars:0,days:[],custom:[],col:{},ds:{},set:{voice:'',rate:.85,vol:1,ar:true,arVoice:'',sfx:true,ls:'rb',pen:'finger'}};
 try{const j=JSON.parse(localStorage.getItem('efi1')||'null');if(j)S=Object.assign(S,j,{set:Object.assign(S.set,j.set||{})})}catch(e){}
 const save=()=>{try{localStorage.setItem('efi1',JSON.stringify(S))}catch(e){}$('#stars').textContent='⭐ '+S.stars};
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()};
@@ -524,9 +524,9 @@ function glyph(ctx,W,ch,mode){const h=W*.2,top=W*.2,ps=nbPaths(ch,W/2,top,h).map
   ctx.strokeStyle='#e3e8f1';ctx.lineWidth=W*.075;ps.forEach(p=>ctx.stroke(p));ctx.strokeStyle='#9fb0cc';ctx.lineWidth=W*.008;ctx.setLineDash([W*.004,W*.022]);ps.forEach(p=>ctx.stroke(p));ctx.setLineDash([])}
  else{ctx.strokeStyle='#000';ctx.lineWidth=W*(mode==='tol'?.17:.03);ps.forEach(p=>ctx.stroke(p))}}
 function trace(i,up){const l=L[i][0],ch=up?l.toUpperCase():l;title('اكتب الحرف '+ch);
- const size=Math.max(240,Math.min(innerWidth-34,innerHeight-300,470)),dpr=Math.min(window.devicePixelRatio||1,2),W=Math.round(size*dpr);
+ const size=Math.max(240,Math.min(innerWidth-34,innerHeight-390,470)),dpr=Math.min(window.devicePixelRatio||1,2),W=Math.round(size*dpr);
  main.innerHTML=`<p class="center" style="margin:0 0 10px">ابدأ من الدائرة رقم 1 واتبع السهم، ثم رقم 2... وبعدها اضغط <b>تحقّق</b></p>
- <div class="tracebox" style="width:${size}px;height:${size}px"><canvas id="cg" width="${W}" height="${W}"></canvas><canvas id="cd" width="${W}" height="${W}"></canvas><svg class="ov" id="ov" viewBox="0 0 ${size} ${size}"></svg></div>
+ <div class="row" style="margin-bottom:8px"><b>أكتب بـ:</b><button class="btn" id="mf" style="min-height:42px">☝️ الإصبع</button><button class="btn" id="mp" style="min-height:42px">✏️ القلم</button></div><p id="mh" class="center" style="margin:0 0 8px;color:var(--mute);font-size:15px"></p><div class="tracebox" style="width:${size}px;height:${size}px"><canvas id="cg" width="${W}" height="${W}"></canvas><canvas id="cd" width="${W}" height="${W}"></canvas><svg class="ov" id="ov" viewBox="0 0 ${size} ${size}"></svg></div>
  <div class="row" style="margin-top:14px"><button class="btn" style="--c:var(--orange)" id="dm">▶️ شاهد طريقة الكتابة</button><button class="btn w" id="ar">➡️ الأسهم</button><button class="btn w" id="cl">🧽 امسح</button><button class="btn" style="--c:var(--green)" id="ck">✅ تحقّق</button><button class="btn w" id="sw">${up?'الصغير '+l:'الكبير '+l.toUpperCase()}</button><button class="btn w" id="hr">🔊</button></div><div id="res" class="center" style="margin-top:12px;min-height:70px"></div>`;
  const g=$('#cg').getContext('2d'),cd=$('#cd'),d=cd.getContext('2d');
  let arrows=1,playing=0;const ov=$('#ov'),ovDraw=()=>{ov.innerHTML=arrows?AH+soSvg(ch,size/2,size*.2,size*.2,size*.009):''};
@@ -537,15 +537,18 @@ function trace(i,up){const l=L[i][0],ch=up?l.toUpperCase():l;title('اكتب ا�
   for(const p of ps){const n=p.getTotalLength()+1,d=Math.max(500,n/size*2600);await new Promise(r=>setTimeout(r,250));p.style.transition='stroke-dashoffset '+d+'ms linear';p.style.strokeDashoffset=0;await new Promise(r=>setTimeout(r,d+150));if(!ov.isConnected)return}
   await new Promise(r=>setTimeout(r,900));playing=0;if(ov.isConnected)ovDraw()};
  if(document.fonts&&document.fonts.load)document.fonts.load('700 50px Andika').then(prep);
- d.lineCap=d.lineJoin='round';d.lineWidth=W*.07;d.strokeStyle='#2b6fd6';let on=0,px,py;
+ d.lineCap=d.lineJoin='round';d.strokeStyle='#2b6fd6';let on=0,px,py,strokes=[],cur=null;
+ const penMode=()=>S.set.pen==='pen',lw=e=>penMode()?W*.032*(e.pointerType==='pen'&&e.pressure>0?.6+e.pressure*.9:1):W*.07;
+ const modeUi=()=>{$('#mf').classList.toggle('w',penMode());$('#mp').classList.toggle('w',!penMode());$('#mh').textContent=penMode()?'وضع القلم: خط رفيع، واليد المستندة على الشاشة لا ترسم.':'وضع الإصبع: خط عريض.'};
+ $('#mf').onclick=()=>{S.set.pen='finger';save();modeUi()};$('#mp').onclick=()=>{S.set.pen='pen';save();modeUi()};modeUi();
  const pos=e=>{const r=cd.getBoundingClientRect();return[(e.clientX-r.left)/r.width*W,(e.clientY-r.top)/r.height*W]};
- cd.onpointerdown=e=>{e.preventDefault();on=1;[px,py]=pos(e);d.beginPath();d.moveTo(px,py);d.lineTo(px+.01,py);d.stroke();try{cd.setPointerCapture(e.pointerId)}catch(_){}};
- cd.onpointermove=e=>{if(!on)return;e.preventDefault();const[x,y]=pos(e);d.beginPath();d.moveTo(px,py);d.lineTo(x,y);d.stroke();px=x;py=y};
+ cd.onpointerdown=e=>{e.preventDefault();if(penMode()&&e.pointerType==='touch'){$('#mh').textContent='وضع القلم مفعّل: اكتب بالقلم، أو اختر «إصبع» للكتابة بالإصبع.';return}on=1;[px,py]=pos(e);cur=[[px,py]];strokes.push(cur);d.lineWidth=lw(e);d.beginPath();d.moveTo(px,py);d.lineTo(px+.01,py);d.stroke();try{cd.setPointerCapture(e.pointerId)}catch(_){}};
+ cd.onpointermove=e=>{if(!on)return;e.preventDefault();const[x,y]=pos(e);d.lineWidth=lw(e);d.beginPath();d.moveTo(px,py);d.lineTo(x,y);d.stroke();px=x;py=y;cur.push([x,y])};
  cd.onpointerup=cd.onpointercancel=()=>on=0;
- $('#cl').onclick=()=>{d.clearRect(0,0,W,W);$('#res').innerHTML=''};
+ $('#cl').onclick=()=>{d.clearRect(0,0,W,W);strokes=[];$('#res').innerHTML=''};
  $('#hr').onclick=()=>speak(ch.toUpperCase());
  $('#sw').onclick=()=>{stack.pop();go(trace,i,up?0:1)};
- $('#ck').onclick=()=>{const n=150,mk=m=>{const c=document.createElement('canvas');c.width=c.height=n;const x=c.getContext('2d',{willReadFrequently:true});if(m==='user')x.drawImage(cd,0,0,n,n);else glyph(x,n,ch,m);return x.getImageData(0,0,n,n).data};
+ $('#ck').onclick=()=>{const n=150,mk=m=>{const c=document.createElement('canvas');c.width=c.height=n;const x=c.getContext('2d',{willReadFrequently:true});if(m==='user'){x.lineCap=x.lineJoin='round';x.lineWidth=n*.07;x.strokeStyle='#000';const k=n/W;strokes.forEach(st=>{x.beginPath();x.moveTo(st[0][0]*k,st[0][1]*k);st.forEach(p=>x.lineTo(p[0]*k+.01,p[1]*k));x.stroke()})}else glyph(x,n,ch,m);return x.getImageData(0,0,n,n).data};
   const M=mk('mask'),T=mk('tol'),U=mk('user');let m=0,mc=0,u=0,out=0;
   for(let p=3;p<M.length;p+=4){const a=M[p]>100,b=U[p]>60;if(a){m++;if(b)mc++}if(b){u++;if(T[p]<60)out++}}
   const cov=m?mc/m:0,sp=u?out/u:1;let s=0;if(cov>=.8&&sp<=.25)s=3;else if(cov>=.6&&sp<=.4)s=2;else if(cov>=.35&&sp<=.6)s=1;
